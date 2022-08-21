@@ -4,7 +4,6 @@ use serde_json::{Result, Value};
 use std::fs::{File, self};
 use std::io::prelude::*;
 use std::path::Path;
-use std::result;
 
 static HUE_DISCOVER_URL: &str = "https://discovery.meethue.com/";
 static HUE_BASE_PATH: &str = "/api";
@@ -163,7 +162,7 @@ struct LoginSuccessModel {
     username: String
 }
 
-fn login(config :&Config) -> std::result::Result<(),&String> {
+fn login(config :&Config) -> std::result::Result<(),String> {
     let mut devicetype = String::new();
     
     {
@@ -195,21 +194,20 @@ fn login(config :&Config) -> std::result::Result<(),&String> {
 
     let body = res.text().expect("Unable to read body");
 
-    let login_response = match serde_json::from_str::<Vec<SuccessResponseModel>>(&body){
-        Ok(val) => val[0].success,
+    match serde_json::from_str::<Vec<SuccessResponseModel>>(&body){
+        Ok(val) => { 
+            let new_config = Config{
+                username: val[0].success.username.clone(),
+                url: config.url.clone()
+            };
+
+            save_config(new_config);
+        }
         Err(_) => {
             let error_response: Vec<ErrorResponseModel> = serde_json::from_str(&body).expect("Unable to read the response from the hue bridge");
-            let error_desc = &(error_response[0].error.description);
-            return Err(format!("Unable to login to the philips hue bridge for the following reason: {}", error_desc));
+            return Err(format!("Unable to login to the philips hue bridge for the following reason: {}", error_response[0].error.description));
         } 
     };
-
-    let new_config = Config{
-        username : login_response.username,
-        ..*config
-    };
-
-    save_config(new_config);
-
-    return Ok(());
+    
+    Ok(())
 }
