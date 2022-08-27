@@ -4,6 +4,7 @@ use serde_json::{Result, Value};
 use std::fs::{File, self};
 use std::io::prelude::*;
 use std::path::Path;
+use std::vec;
 
 static HUE_DISCOVER_URL: &str = "https://discovery.meethue.com/";
 static HUE_BASE_PATH: &str = "/api";
@@ -55,6 +56,12 @@ fn main() {
                 .long_flag("login")
                 .about("Test connection to hue bridge")
         )
+        .subcommand(
+            Command::new("list")
+                .long_flag("ls")
+                .about("List all devices on the network")
+        )
+ 
         .arg_required_else_help(true)
         .get_matches();
 
@@ -68,6 +75,7 @@ fn main() {
                 _ => ()
             }
         },
+        Some(("list", _)) => list(&config), 
         _ => unreachable!(),
     };
 }
@@ -105,10 +113,7 @@ fn discover(){
             let value: Vec<DiscoverResponse> = serde_json::from_str(&body).unwrap();
             let ip = &value[0].internalipaddress;
 
-            let mut url = String::new();
-
-            url.push_str(ip);
-            url.push(':');
+            let url = String::from(ip);
 
             println!("Hue bridge is located at {ip}");
             save_config(Config{
@@ -180,11 +185,7 @@ fn login(config :&Config) -> std::result::Result<(),String> {
         .read_line(&mut input_buffer)
         .expect("Failed to read line");
 
-    let mut api_url = String::new();
-
-    api_url.push_str("http://");
-    api_url.push_str(&config.url);
-    api_url.push_str(HUE_BASE_PATH);
+    let api_url = format!("http://{}{}", config.url, HUE_BASE_PATH);
 
     let reqbody = format!("{{\"devicetype\":\"{}\"}}", devicetype);
     let client = reqwest::blocking::Client::new();
@@ -210,4 +211,53 @@ fn login(config :&Config) -> std::result::Result<(),String> {
     };
     
     Ok(())
+}
+
+fn list(config: &Config){
+    let api_url = format!("http://{}{}/{}/lights", config.url,HUE_BASE_PATH, config.username);
+
+    let res = reqwest::blocking::get(api_url).expect("Unable to connect to discover service");
+    
+    match res.status(){
+        reqwest::StatusCode::OK => {
+            let body = res.text().expect("Unable to read body");
+                let v: Value = serde_json::from_str(&body).expect("");
+                let mut list_of_lights : Vec<LightModel> = Vec::new();
+                
+                for (_ , value) in v.as_object().unwrap() {
+                   list_of_lights.push(parse_light_json(value.to_string()));
+                }
+
+                print_lights(list_of_lights);
+            },
+        other => println!("Failed to contact {HUE_DISCOVER_URL}. Status code: {other}")
+    }
+}
+
+fn parse_light_json(light_model_string: String) -> LightModel{
+    let parse_light_json: LightModel = serde_json::from_str(&light_model_string).expect("Failed to parse light model");
+
+    parse_light_json
+}
+
+fn print_lights(lights: Vec<LightModel>){
+    for light in lights {
+        if light.state.on {
+            println!("{}: ON", light.name);
+        }
+        else{
+            println!("{}: OFF", light.name);
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct LightModel {
+    name: String,
+    state: LightStateModel
+}
+
+#[derive(Serialize, Deserialize)]
+struct LightStateModel {
+    on: bool 
 }
