@@ -211,6 +211,10 @@ fn login(config :&Config) -> std::result::Result<(),String> {
 }
 
 fn list(config: &Config){
+    print_lights(get_all_lights(config));
+}
+
+fn get_all_lights(config: &Config) -> Vec<LightModel>{
     let api_url = format!("http://{}{}/{}/lights", config.url,HUE_BASE_PATH, config.username);
 
     let res = reqwest::blocking::get(api_url).expect("Unable to connect to discover service");
@@ -225,9 +229,12 @@ fn list(config: &Config){
                    list_of_lights.push(parse_light_json(value.to_string()));
                 }
 
-                print_lights(list_of_lights);
+                list_of_lights
             },
-        other => println!("Failed to contact {HUE_DISCOVER_URL}. Status code: {other}")
+        other => {
+            println!("Failed to contact {HUE_DISCOVER_URL}. Status code: {other}");
+            Vec::new()
+        }
     }
 }
 
