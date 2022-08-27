@@ -4,7 +4,6 @@ use serde_json::{Result, Value};
 use std::fs::{File, self};
 use std::io::prelude::*;
 use std::path::Path;
-use std::vec;
 
 static HUE_DISCOVER_URL: &str = "https://discovery.meethue.com/";
 static HUE_BASE_PATH: &str = "/api";
@@ -70,9 +69,9 @@ fn main() {
     match matches.subcommand() {
         Some(("discover", _)) => discover(),
         Some(("test", _)) => {test(&config);}, 
-        Some(("login", _)) => { match login(&config) {
-                Err(msg) => println!("{msg}"),
-                _ => ()
+        Some(("login", _)) => { let r = login(&config);
+            if let Err(msg) = r{
+                println!("{msg}");
             }
         },
         Some(("list", _)) => list(&config), 
@@ -88,7 +87,7 @@ fn test(config: &Config) -> bool{
     testurl.push_str(HUE_BASE_PATH);
 
     let res = reqwest::blocking::get(&testurl).expect("Unable to connect to the hue bridge on {testurl}");
-    let result = match res.status(){
+    match res.status(){
         reqwest::StatusCode::OK => {
             println!("Able to connect to the hue bridge on {testurl}");
             true
@@ -97,9 +96,7 @@ fn test(config: &Config) -> bool{
             println!("Issue connecting to the hue bridge {testurl}");
             false
         }
-    };
-
-    result
+    }
 }
 
 fn discover(){
