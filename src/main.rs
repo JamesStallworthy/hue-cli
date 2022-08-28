@@ -60,7 +60,17 @@ fn main() {
                 .long_flag("ls")
                 .about("List all devices on the network")
         )
- 
+        .subcommand(
+            Command::new("set")
+                .long_flag("set")
+                .about("Set a lights status")
+                    .subcommand(Command::new("on")
+                               .about("Set a light to on")
+                               .arg(Arg::new("NAME")
+                                    .required(true)
+                                    .max_values(1))
+                    )
+        )
         .arg_required_else_help(true)
         .get_matches();
 
@@ -74,7 +84,14 @@ fn main() {
                 println!("{msg}");
             }
         },
-        Some(("list", _)) => list(&config), 
+        Some(("list", _)) => list(&config),
+        Some(("set", sub)) => {
+            match sub.subcommand() {
+                Some(("on", args)) => set_state(State::On(true), String::from(args.value_of("NAME").unwrap())),
+                Some(("OFF", _)) => println!("Here"),
+                _ => unreachable!(),
+            }
+        },
         _ => unreachable!(),
     };
 }
@@ -264,4 +281,19 @@ struct LightModel {
 #[derive(Serialize, Deserialize)]
 struct LightStateModel {
     on: bool 
+}
+
+enum State{
+    On(bool),
+}
+
+fn set_state(s: State, name: String){ 
+    let light_model_state = match s{
+        State::On(val) => {
+            LightStateModel{
+                on: val
+            }
+        },
+    };
+    println!("{}: {}", name, light_model_state.on);
 }
