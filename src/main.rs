@@ -97,12 +97,8 @@ fn main() {
 }
 
 fn test(config: &Config) -> bool{
-    let mut testurl = String::new();
+    let testurl = format!("http://{}{}", config.url, HUE_BASE_PATH);
  
-    testurl.push_str("http://");
-    testurl.push_str(&config.url);
-    testurl.push_str(HUE_BASE_PATH);
-
     let res = reqwest::blocking::get(&testurl).expect("Unable to connect to the hue bridge on {testurl}");
     match res.status(){
         reqwest::StatusCode::OK => {
@@ -182,15 +178,14 @@ struct LoginSuccessModel {
 }
 
 fn login(config :&Config) -> std::result::Result<(),String> {
-    let mut devicetype = String::new();
-    
+    let devicetype;    
     {
         let devicename = whoami::devicename();
 
-        devicetype.push_str(APPLICATION_NAME);
-        devicetype.push('#');
-        devicetype.push_str(&devicename);
+        devicetype = format!("{}#{}", APPLICATION_NAME, devicename);
     }
+
+    println!("{devicetype}");
 
     println!("Press the link button on the hue bridge, then press any button to continue");
     let mut input_buffer = String::new(); 
