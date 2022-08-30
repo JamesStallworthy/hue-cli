@@ -70,6 +70,12 @@ fn main() {
                                     .required(true)
                                     .max_values(1))
                     )
+                    .subcommand(Command::new("off")
+                               .about("Set a light to off")
+                               .arg(Arg::new("NAME")
+                                    .required(true)
+                                    .max_values(1))
+                    )
         )
         .arg_required_else_help(true)
         .get_matches();
@@ -87,8 +93,8 @@ fn main() {
         Some(("list", _)) => list(&config),
         Some(("set", sub)) => {
             match sub.subcommand() {
-                Some(("on", args)) => set_state(State::On(true), String::from(args.value_of("NAME").unwrap())),
-                Some(("OFF", _)) => println!("Here"),
+                Some(("on", args)) => set_state(State::On(true), String::from(args.value_of("NAME").unwrap()), &config),
+                Some(("off", args)) => set_state(State::On(false), String::from(args.value_of("NAME").unwrap()), &config),
                 _ => unreachable!(),
             }
         },
@@ -282,7 +288,7 @@ enum State{
     On(bool),
 }
 
-fn set_state(s: State, name: String){ 
+fn set_state(s: State, name: String, config: &Config){ 
     let light_model_state = match s{
         State::On(val) => {
             LightStateModel{
@@ -290,5 +296,34 @@ fn set_state(s: State, name: String){
             }
         },
     };
-    println!("{}: {}", name, light_model_state.on);
+
+    //find the light
+    let all_lights = get_all_lights(config);
+    
+    let mut index_of_light: i8 = -1;
+
+    for (index,value) in all_lights.iter().enumerate() {
+        if value.name == name {
+            index_of_light = index as i8;
+        }
+    }
+
+    if index_of_light == -1 {
+        println!("Invalid light name {}", name);
+        return;
+    }
+    //Hue does not use 0 index
+    index_of_light += 1;
+
+    let light_model_state = serde_json::to_string(&light_model_state).unwrap();
+
+    let api_url = format!("http://{}{}/{}/lights/{}/state",config.url, HUE_BASE_PATH,config.username, index_of_light);
+
+    let client = reqwest::blocking::Client::new();
+    let res = client.put(api_url)
+                        .body(light_model_state)
+                        .send().expect("Unable to post login request");
+
+    println!("{}", res.text().unwrap());
+
 }
