@@ -173,9 +173,9 @@ struct ErrorModel {
     description: String
 }
 
-#[derive(Serialize, Deserialize)]
-struct SuccessResponseModel {
-    success: LoginSuccessModel 
+#[derive(Debug, Serialize, Deserialize)]
+struct SuccessResponseModel<T> {
+    success: T 
 }
 
 #[derive(Serialize, Deserialize)]
@@ -210,7 +210,7 @@ fn login(config :&Config) -> std::result::Result<(),String> {
 
     let body = res.text().expect("Unable to read body");
 
-    match serde_json::from_str::<Vec<SuccessResponseModel>>(&body){
+    match serde_json::from_str::<Vec<SuccessResponseModel<LoginSuccessModel>>>(&body){
         Ok(val) => { 
             let new_config = Config{
                 username: val[0].success.username.clone(),
@@ -323,7 +323,11 @@ fn set_state(s: State, name: String, config: &Config){
     let res = client.put(api_url)
                         .body(light_model_state)
                         .send().expect("Unable to post login request");
+    let body = res.text().unwrap();
 
-    println!("{}", res.text().unwrap());
-
+    match serde_json::from_str::<Vec<SuccessResponseModel<Value>>>(&body){
+        Ok(_) => println!("Turned on {} successfully", name),
+        Err(_) => println!("Something went wrong when turning on light")//Todo get error message
+                                                                        //from response
+    }
 }
