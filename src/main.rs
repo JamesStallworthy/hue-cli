@@ -68,13 +68,22 @@ fn main() {
                                .about("Set a light to on")
                                .arg(Arg::new("NAME")
                                     .required(true)
-                                    .max_values(1))
+                                    )
                     )
                     .subcommand(Command::new("off")
                                .about("Set a light to off")
                                .arg(Arg::new("NAME")
                                     .required(true)
-                                    .max_values(1))
+                                )
+                    )
+                    .subcommand(Command::new("bri")
+                               .about("Set a brightness of a light between 0 and 100")
+                               .arg(Arg::new("NAME")
+                                    .required(true)
+                                    )
+                               .arg(Arg::new("BRI")
+                                    .required(true)
+                                    )
                     )
         )
         .arg_required_else_help(true)
@@ -95,11 +104,31 @@ fn main() {
             match sub.subcommand() {
                 Some(("on", args)) => set_state(State::On(true), String::from(args.value_of("NAME").unwrap()), &config),
                 Some(("off", args)) => set_state(State::On(false), String::from(args.value_of("NAME").unwrap()), &config),
+                Some(("bri", args)) => {
+                    match validate_bri_value(args.value_of("BRI").unwrap()){
+                        Ok(val) => set_state(State::Bri(val),String::from(args.value_of("NAME").unwrap()), &config),
+                        Err(msg) => println!("Unable to set brightness: {}", msg)
+                    }
+                }
                 _ => unreachable!(),
             }
         },
         _ => unreachable!(),
     };
+}
+
+fn validate_bri_value(value: &str) -> std::result::Result<u8,Box<dyn std::error::Error>>{
+   match value.parse::<u8>() {
+       Ok(val) =>{ 
+           if val <= 100{
+               Ok(val)
+           }
+           else{
+               Err("Brightness value not between 0 and 100".into())
+           }
+       },
+       Err(msg) => Err(msg.into())
+   }
 }
 
 fn test(config: &Config) -> bool{
@@ -281,27 +310,30 @@ struct LightModel {
 
 #[derive(Serialize, Deserialize)]
 struct LightStateModel {
-    on: bool 
+    on: bool,
+    bri: u8
 }
 
 enum State{
     On(bool),
+    Bri(u8)
 }
 
-fn state_to_user_msg(s: State) -> &'static str {
+fn state_to_user_msg(s: State) -> String {
     match s {
-        State::On(true) => "Turned on",
-        State::On(false) => "Turned off"
+        State::On(true) => String::from("Turned on"),
+        State::On(false) => String::from("Turned off"),
+        State::Bri(val) => format!("Set brightness to {} for", val)
     }
 }
 
 fn set_state(s: State, name: String, config: &Config){ 
     let light_model_state = match s{
-        State::On(val) => {
-            LightStateModel{
-                on: val
-            }
-        },
+        State::On(val) => format!("{{\"on\":{}}}", val),
+        State::Bri(val) => {
+            println!("{val}");
+            format!("{{\"bri\":{}}}", (((val as f32)/100.0)*255.0).floor())
+        }  
     };
 
     //find the light
@@ -322,8 +354,6 @@ fn set_state(s: State, name: String, config: &Config){
     //Hue does not use 0 index
     index_of_light += 1;
 
-    let light_model_state = serde_json::to_string(&light_model_state).unwrap();
-
     let api_url = format!("http://{}{}/{}/lights/{}/state",config.url, HUE_BASE_PATH,config.username, index_of_light);
 
     let client = reqwest::blocking::Client::new();
@@ -334,7 +364,12 @@ fn set_state(s: State, name: String, config: &Config){
 
     match serde_json::from_str::<Vec<SuccessResponseModel<Value>>>(&body){
         Ok(_) => println!("{} {} successfully",state_to_user_msg(s), name),
-        Err(_) => println!("Something went wrong when turning on light")//Todo get error message
-                                                                        //from response
+        Err(_) => {
+            let error_msg: Vec<ErrorResponseModel> = serde_json::from_str(&body).unwrap();
+            match error_msg[0].error.error_type {
+                201 => println!("Cannot set value on a light that is not turned on"),
+                _ => println!("Something went wrong when set a state on the light")
+            }
+        }
     }
 }
