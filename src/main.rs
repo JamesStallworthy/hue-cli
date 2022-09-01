@@ -288,6 +288,13 @@ enum State{
     On(bool),
 }
 
+fn state_to_user_msg(s: State) -> &'static str {
+    match s {
+        State::On(true) => "Turned on",
+        State::On(false) => "Turned off"
+    }
+}
+
 fn set_state(s: State, name: String, config: &Config){ 
     let light_model_state = match s{
         State::On(val) => {
@@ -326,7 +333,7 @@ fn set_state(s: State, name: String, config: &Config){
     let body = res.text().unwrap();
 
     match serde_json::from_str::<Vec<SuccessResponseModel<Value>>>(&body){
-        Ok(_) => println!("Turned on {} successfully", name),
+        Ok(_) => println!("{} {} successfully",state_to_user_msg(s), name),
         Err(_) => println!("Something went wrong when turning on light")//Todo get error message
                                                                         //from response
     }
