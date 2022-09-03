@@ -49,6 +49,7 @@ hue-cli set bri "Living Room Light" 50
 - [x] Turn off light
 - [x] Set brightness of light
 - [ ] Set colour of light
+- [ ] Set Alias Names for lights to easily reference them later
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
