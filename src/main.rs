@@ -336,6 +336,8 @@ fn set_state(s: State, name: String, config: &Config){
         }  
     };
 
+    println!("{light_model_state}");
+
     //find the light
     let all_lights = get_all_lights(config);
     
@@ -368,7 +370,7 @@ fn set_state(s: State, name: String, config: &Config){
             let error_msg: Vec<ErrorResponseModel> = serde_json::from_str(&body).unwrap();
             match error_msg[0].error.error_type {
                 201 => println!("Cannot set value on a light that is not turned on"),
-                _ => println!("Something went wrong when set a state on the light")
+                _ => println!("Something went wrong when setting a state on the light: {}", error_msg[0].error.description)
             }
         }
     }
