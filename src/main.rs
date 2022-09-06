@@ -1,6 +1,7 @@
 use clap::{Arg, App, Command};
 use serde::{Serialize, Deserialize};
 use serde_json::{Result, Value};
+use std::collections::HashMap;
 use std::fs::{File, self};
 use std::io::prelude::*;
 use std::path::Path;
@@ -14,14 +15,16 @@ static APPLICATION_NAME: &str = "hue-cli";
 #[derive(Serialize, Deserialize)]
 struct Config {
     url: String,
-    username: String
+    username: String,
+    aliases: HashMap::<String, String>
 }
 
 impl Default for Config{
     fn default() -> Config {
        Config {
            url: String::from("127.0.0.1"),
-           username: String::new()
+           username: String::new(),
+           aliases: HashMap::new()
        } 
     }
 }
@@ -85,6 +88,15 @@ fn main() {
                                     .required(true)
                                     )
                     )
+                    .subcommand(Command::new("alias")
+                               .about("Set a alias name for a light so that it is easier to reference later")
+                               .arg(Arg::new("NAME")
+                                    .required(true)
+                                    )
+                               .arg(Arg::new("ALIAS")
+                                    .required(true)
+                                    )
+                    )
         )
         .arg_required_else_help(true)
         .get_matches();
@@ -109,7 +121,8 @@ fn main() {
                         Ok(val) => set_state(State::Bri(val),String::from(args.value_of("NAME").unwrap()), &config),
                         Err(msg) => println!("Unable to set brightness: {}", msg)
                     }
-                }
+                },
+                Some(("alias", args)) => set_alias(String::from(args.value_of("NAME").unwrap()), String::from(args.value_of("ALIAS").unwrap()), &config),
                 _ => unreachable!(),
             }
         },
@@ -180,7 +193,7 @@ fn save_config(new_config: Config){
 
 fn load_config() -> Config {
    if !Path::new(CONFIG_FILE).exists(){
-       save_config(Config { url: String::new(), ..Default::default() });
+       save_config(Config { ..Default::default() });
    }
 
    let config = fs::read_to_string(CONFIG_FILE).unwrap();
@@ -243,7 +256,8 @@ fn login(config :&Config) -> std::result::Result<(),String> {
         Ok(val) => { 
             let new_config = Config{
                 username: val[0].success.username.clone(),
-                url: config.url.clone()
+                url: config.url.clone(),
+                aliases: config.aliases.clone() 
             };
 
             save_config(new_config);
@@ -338,6 +352,11 @@ fn set_state(s: State, name: String, config: &Config){
 
     println!("{light_model_state}");
 
+    let name = match config.aliases.get(&name) {
+        Some(val) => val.clone(),
+        None => name
+    };
+
     //find the light
     let all_lights = get_all_lights(config);
     
@@ -374,4 +393,36 @@ fn set_state(s: State, name: String, config: &Config){
             }
         }
     }
+}
+
+fn set_alias(name: String, a: String, config: &Config){
+    if config.aliases.contains_key(&a) {
+        println!("Alias {} has already been set", a);
+        return
+    }
+
+    let lights = get_all_lights(config);
+
+    let mut valid_light_name = false;
+    for light in lights.iter() {
+        if light.name == name{
+            valid_light_name = true;
+        }
+    }
+
+    if !valid_light_name{
+        println!("Invalid light name: {}", name);
+        return
+    }
+
+    let mut hm = config.aliases.clone();
+    hm.insert(a, name);
+
+    let new_config = Config{
+        url : config.url.clone(),
+        username : config.username.clone(),
+        aliases: hm
+    };
+
+    save_config(new_config);
 }
