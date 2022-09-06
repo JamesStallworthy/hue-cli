@@ -43,13 +43,21 @@ Set brightness of a light
 hue-cli set bri "Living Room Light" 50
 ```
 
+Set alias for a light 
+```console
+hue-cli set alias "Living Room Light" LL
+
+#Using the alias
+hue-cli set on LL
+```
+
 ## Features
 - [x] Login to Hue Bridge
 - [x] Turn on light
 - [x] Turn off light
 - [x] Set brightness of light
 - [ ] Set colour of light
-- [ ] Set Alias Names for lights to easily reference them later
+- [x] Set Alias Names for lights to easily reference them later
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
