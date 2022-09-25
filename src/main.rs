@@ -350,8 +350,6 @@ fn set_state(s: State, name: String, config: &Config){
         }  
     };
 
-    println!("{light_model_state}");
-
     let name = match config.aliases.get(&name) {
         Some(val) => val.clone(),
         None => name
